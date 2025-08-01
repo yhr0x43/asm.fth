@@ -121,7 +121,8 @@ Constant IMAGE_FILE_HEADER
 8 Constant IMAGE_SIZEOF_SHORT_NAME
 0
     IMAGE_SIZEOF_SHORT_NAME +Field scn.Name
-    0 +Field scn.PhysicalAddress    4 +Field scn.VirtualSize
+    0 +Field scn.PhysicalAddress
+    4 +Field scn.VirtualSize
     4 +Field scn.VirtualAddress
     4 +Field scn.SizeOfRawData
     4 +Field scn.PointerToRawData

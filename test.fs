@@ -18,7 +18,7 @@ sbuffer allocate throw Constant out-buf
 : .rd ( addr u -- ) .cur ['] l! xref 0 .dd ;
 : $ [char] $ parse ;
 
-require winnt.fs
+require coff.fs
 
 hex
 IMAGE_FILE_MACHINE_AMD64	.dw \ Machine
