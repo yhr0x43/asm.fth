@@ -1,113 +1,51 @@
+\ asm.fs - Assembler utils
+\ concept of sect is defined here, a sect (section) is the unit of relocation
+\ it is also directly tied to PE/ELF sections, where it has datastructure
+\ for assembling such sections in practice
+
+base @
+hex
+
+require dynarr.fs
+require xref.fs
+
+\ TODO: section name longer than 8 chars
 0
-    1 cells +Field s.addr
-    1 cells +Field s.size
-    1 cells +Field s.cap
-Constant sbuffer
+    8      +Field sect.name
+    cell   +Field sect.name-len
+    dynarr +Field sect.buffer
+    xrefs  +Field sect.xrefs
+Constant sect
 
-: >pow2 ( n -- pow2 )
-    -1
-    BEGIN 2dup and WHILE
-            1 lshift
-    REPEAT
-    1 rshift and 1 lshift ;
+dynarr allocate throw Constant sect_list
+sect_list dynarr-init
 
-: s-@ ( s-addr -- addr u )
-    dup  s.addr @
-    swap s.size @ ;
+: sect-new ( name-addr name-u -- sect-addr )
+    sect_list sect dynarr-append
+    >r
+    dup 8 > IF ABORT" section name must be shorter than 8 chars" THEN
+    dup r@ sect.name-len !
+    r@ sect.name swap move
+    r@ sect.buffer dynarr-init
+    r@ sect.xrefs  dynarr-init
+    r>
+;
 
-: s-reserve ( s-addr u -- )
-    over s.size @ + tuck ( n s-addr n )
-    over s.cap  @
-    > IF ( n s-addr )
-        tuck s.addr @   ( s-addr n a-addr )
-        swap >pow2 tuck ( s-addr pow2 a-addr pow2 )
-        resize throw
-        2 pick s.addr !
-        swap s.cap !
-    ELSE
-        2drop
-    THEN ;
+Variable this_sect
 
-: s-! ( addr u s-addr -- )
-    0 allocate throw over s.addr !
-    0 over s.cap !
-    0 over s.size !
-    2dup swap s-reserve
-    2dup s.size +!
-    s.addr swap move ;
+: .sect ( name-addr name-u -- ) sect-new this_sect ! ;
 
-: s-? ( s-addr -- )
-    dup s.addr ?
-    dup s.size ?
-    s.cap ? ;
+: .cur ( -- offset-u ) this_sect @ sect.buffer dynarr.size @ ;
+: .equ ( name-addr name-u val-u -- ) this_sect @ sect.xrefs xval ;
+: .val ( name-addr name-u -- val-u ) this_sect @ sect.xrefs xgetval ;
 
-: s-append ( s-addr n -- a-addr )
-    2dup s-reserve over s-@ + >r swap s.size +! r> ;
+: .db ( c -- )      this_sect @ sect.buffer 1 dynarr-append c! ;
+: .dw ( w -- )      this_sect @ sect.buffer 2 dynarr-append w! ;
+: .dd ( u -- )      this_sect @ sect.buffer 4 dynarr-append l! ;
+: .ds ( addr u -- ) this_sect @ sect.buffer over dynarr-append swap move ;
 
-: s-db ( x s-addr -- )
-    1 s-append c! ;
+: .rb ( c -- ) .cur ['] c! this_sect @ sect.xrefs xref 0 .db ;
+: .rw ( c -- ) .cur ['] w! this_sect @ sect.xrefs xref 0 .dw ;
+: .rd ( c -- ) .cur ['] l! this_sect @ sect.xrefs xref 0 .dd ;
 
-: s-dw ( x s-addr -- )
-    2 s-append w! ;
-
-: s-dd ( x s-addr -- )
-    4 s-append l! ;
-
-: s-d! ( x s-addr -- )
-    1 cells s-append ! ;
-
-: s-ds ( addr u s-addr -- )
-    over s-append swap move ;
-
-wordlist Constant xrefs-wl
-wordlist Constant xvals-wl
-
-0
-    1 cells +Field xrefcell.last
-    1 cells +Field xrefcell.xt
-    1 cells +Field xrefcell.offset
-Constant xrefcell
-
-: xref ( name-addr name-u x xt! -- )
-    2>r
-    2dup xvals-wl search-wordlist
-    0<> IF				\ when value exists, just deposit the value
-        2drop
-        2r> >body @ swap rot execute
-    ELSE				\ otherwise, append a cell to the linked list in xrefs-wl
-        2dup nextname
-        xrefs-wl search-wordlist
-        0= IF 0 ELSE >body THEN
-        2r> rot
-        get-current >r
-        xrefs-wl set-current
-        Create , , ,
-        r> set-current
-    THEN ;
-
-: x@val ( addr u -- n )
-    xvals-wl search-wordlist
-    0= throw
-    >body @ ;
-
-: xval ( name-addr name-u n b-addr -- )
-    2swap 2dup 2>r
-    xrefs-wl search-wordlist
-    0<> IF
-        >body
-        BEGIN ( n b-addr a-addr )
-            dup WHILE
-                dup dup >r >r >r
-                2dup ( n b-addr n b-addr )
-                r> xrefcell.offset @ +
-                r> xrefcell.xt @
-                execute
-                r> @
-        REPEAT
-        2drop
-    THEN
-    2r> nextname
-    get-current >r
-    xvals-wl set-current
-    Create ,
-    r> set-current ;
+base !

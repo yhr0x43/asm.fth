@@ -1,5 +1,6 @@
-\ xref.fs
-\ provide named reference to a offste in a dynarr
+\ xref.fs - provide named reference to a offste in a dynarr
+\ Typical Usage:
+\
 
 require dynarr.fs
 
@@ -11,61 +12,94 @@ hex
     cell +Field xrefp.offset \ addr = base + offset
 Constant xrefp \ xref pair
 
-80 Constant xrefl.VALID
-1F Constant xrefl.LENGTH
-
 0
-    1 aligned +Field xrefl.flag  \ =(valid?VALID:0)|(name_len&LENGTH)
-    32 chars  +Field xrefl.name  \ TODO: symbol name length limit at 32
+    20 chars  +Field xrefl.name  \ TODO: symbol name length limit at 20hex
+    cell      +Field xrefl.name-len
     cell      +Field xrefl.value
-    dynarr    +Field xrefl.array \ array of xrefp
+    dynarr    +Field xrefl.data  \ array of xrefp
 Constant xrefl \ xref list
 
-dynarr Constant xrefs \ array of xrefl (xref plural)
+0
+    dynarr +Field xrefs.data
+Constant xrefs \ array of xrefl (xref plural)
 
-: xrefl-new ( name-addr name-u xrefs-addr --  xrefl-addr )
-    xrefl dynarr-append
+: xrefl-? ( xrefl-addr -- )
+    dup  xrefl.name
+    over xrefl.name-len @
+    [char] " emit
+    type
+    [char] " emit
+     ."  "
+
+    dup xrefl.name-len ?
+    dup xrefl.value ?
+        xrefl.data  dynarr-?
+;
+
+: xrefs-? ( xrefs-addr -- )
+    ." xrefs:" cr
+    dynarr-range
+    ?DO
+        i . ." : " i xrefl-? cr
+    xrefl +LOOP
+;
+
+: xrefl-new ( name-addr name-u xrefs-addr -- xrefl-addr )
+    xrefs.data xrefl dynarr-append
     >r
-    dup xrefl.LENGTH and   r@ xrefl.flag   @
-                           r@ xrefl.name   cmove
+    dup r@ xrefl.name-len !
+    r@ xrefl.name swap move
+
+    0 r@ xrefl.value !
+    r@ xrefl.data dynarr-init
     r>
 ;
 
-: xrefl-find {: name-addr name-u xrefs-addr -- xrefl-addr :}
-    name-u 32 > IF
-        0 EXIT
+: xrefl-find ( name-addr name-u xrefs-addr -- xrefl-addr | 0 )
+    over 32 > IF
+        ABORT" symbol name longer than 32 not supported"
     THEN
-    0 \ do loop results 0 when xrefl not found
-    xref-addr dynarr.size @
-    0
-    DO
-        drop
-        xrefs-addr dynarr.data @ i xrefl * +
-        dup  xrefl.name
-        swap xrefl.flag xrefl.LENGTH and
-        name-addr name-u
-        compare 0= IF
-            drop xrefs-addr UNLOOP EXIT
-        THEN
-    LOOP
+    dynarr-range
+    \ for each xrefl in the xrefs
+    ?DO
+        2dup
+        i xrefl.name
+        i xrefl.name-len @
+        compare 0= IF 2drop i UNLOOP EXIT THEN
+    xrefl +LOOP
+    2drop
+    0 \ results 0 when xrefl not found
 ;
 
 : xrefp-new ( offset-n xt xrefl-addr -- xrefp-addr )
-    xrefp dynarr-append
+    xrefl.data xrefp dynarr-append
     tuck xrefp.xt     !
     tuck xrefp.offset !
 ;
 
-: xref {: name-addr name-u offset-n xt xrefs-addr -- :}
-    name-addr name-u xrefs-addr xrefl-find
-    dup 0= IF drop xrefl-new THEN
-    offset-n xt rot xrefp-new
+\ ensures a name exists in the xrefs table
+: xrefl-ensure ( name-addr name-u xrefs-addr -- xrefl-addr )
+    2 pick 2 pick 2 pick
+    xrefl-find
+    ?dup 0= IF
+        xrefl-new
+    ELSE
+        >r drop drop drop r>
+    THEN
+;
+
+: xref ( name-addr name-u offset-n xt xrefs-addr -- )
+    rot rot 2>r
+    xrefl-ensure
+    2r> rot
+    xrefp-new
+    drop
 ;
 
 : xrefl-apply ( base-addr xrefl-addr -- )
     dup  xrefl.value
-    over xrefl.array dup da.size swap da.data +
-    rot  xrefl.array da.data
+    over xrefl.data @ dup dynarr.size @ swap dynarr.data @ +
+    rot  xrefl.data @ dynarr.data @
     DO ( base-addr xrefl-value )
         2dup swap
         i xrefp.offset +
@@ -75,11 +109,23 @@ dynarr Constant xrefs \ array of xrefl (xref plural)
 ;
 
 : xrefs-apply ( base-addr xrefs-addr -- )
-    dup  da.data over da.size xrefl * +
-    swap da.data
-    DO
+    dynarr-range
+    ?DO
         dup i xrefl-apply
     xrefl +LOOP
+;
+
+: xval ( name-addr name-u val-n xrefs-addr -- )
+    swap >r
+    2 pick 2 pick 2 pick
+    xrefl-find
+    ?dup 0= IF xrefl-new ELSE >r drop drop drop r> THEN
+    r> swap xrefl.value !
+;
+
+: xgetval ( name-addr name-u xrefs-addr -- val-u )
+    xrefl-find ?dup 0= IF ABORT" undefined symbol" THEN
+    xrefl.value @
 ;
 
 base !

@@ -7,11 +7,12 @@
 \ in code-comments, da-addr is a reference to dynamic array
 
 0
-    cell +Field da.size
-    cell +Field da.cap
-    cell +Field da.data
-Constant da
+    cell +Field dynarr.size
+    cell +Field dynarr.cap
+    cell +Field dynarr.data
+Constant dynarr
 
+[UNDEFINED] >pow2 [IF]
 : >pow2 ( n -- pow2 )
     -1
     BEGIN 2dup and WHILE
@@ -19,41 +20,50 @@ Constant da
     REPEAT
     1 rshift and 1 lshift
 ;
+[THEN]
 
-: da-@ ( da-addr -- addr u )
-    dup  da.addr @
-    swap da.size @
+: dynarr-@ ( da-addr -- addr u )
+    dup  dynarr.data @
+    swap dynarr.size @
 ;
 
-: da-reserve ( da-addr u -- )
-    over da.size @ + tuck ( n da-addr n )
-    over da.cap  @
-    > IF ( n da-addr )
-        tuck s.addr @   ( da-addr n a-addr )
-        swap >pow2 tuck ( da-addr pow2 a-addr pow2 )
-        resize throw
-        2 pick s.addr !
-        swap s.cap !
+: dynarr-range ( da-addr -- begin-addr end-addr )
+    dup  dynarr-@ +
+    swap dynarr.data @
+;
+
+: dynarr-init ( da-addr -- )
+    dynarr 0 fill
+;
+
+: dynarr-recap ( da-addr u -- )
+    2dup swap dynarr.cap !
+    over dynarr.data @
+    ?dup 0= IF allocate ELSE swap resize THEN throw
+    swap dynarr.data !
+;
+
+: dynarr-reserve ( da-addr u -- )
+    over dynarr.size @ + tuck
+    over dynarr.cap  @
+    > IF ( newcap-u da-addr )
+        swap >pow2
+        dynarr-recap
     ELSE
         2drop
     THEN
 ;
 
-: da-! ( addr u da-addr -- )
-    0 allocate throw over s.addr !
-    0 over s.cap !
-    0 over s.size !
-    2dup swap da-reserve
-    2dup s.size +!
-    s.addr swap move
+: dynarr-append ( da-addr n -- a-addr )
+    2dup dynarr-reserve
+    over dynarr-@ +
+    >r
+    swap dynarr.size +!
+    r>
 ;
 
-: da-? ( da-addr -- )
-    dup da.addr ?
-    dup da.size ?
-        da.cap  ?
-;
-
-: da-append ( s-addr n -- a-addr )
-    2dup da-reserve over da-@ + >r swap da.size +! r>
+: dynarr-? ( da-addr -- )
+    dup dynarr.data ?
+    dup dynarr.size ?
+        dynarr.cap  ?
 ;
