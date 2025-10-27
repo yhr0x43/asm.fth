@@ -14,7 +14,8 @@ Constant xrefp \ xref pair
 
 0
     20 chars  +Field xrefl.name  \ TODO: symbol name length limit at 20hex
-    cell      +Field xrefl.name-len
+    1  chars  +Field xrefl.name-len
+    1 aligned +Field xrefl.assigned
     cell      +Field xrefl.value
     dynarr    +Field xrefl.data  \ array of xrefp
 Constant xrefl \ xref list
@@ -24,32 +25,35 @@ Constant xrefl \ xref list
 Constant xrefs \ array of xrefl (xref plural)
 
 : xrefl-? ( xrefl-addr -- )
+    dup . ." : "
     dup  xrefl.name
-    over xrefl.name-len @
+    over xrefl.name-len c@
     [char] " emit
     type
     [char] " emit
-     ."  "
-
-    dup xrefl.name-len ?
+     ."  = "
     dup xrefl.value ?
-        xrefl.data  dynarr-?
+    xrefl.data  dynarr-range
+    ?DO
+        cr ."     "
+        i xrefp.xt ?
+        i xrefp.offset ?
+    xrefp +LOOP
 ;
 
 : xrefs-? ( xrefs-addr -- )
     ." xrefs:" cr
     dynarr-range
     ?DO
-        i . ." : " i xrefl-? cr
+        i xrefl-? cr
     xrefl +LOOP
 ;
 
 : xrefl-new ( name-addr name-u xrefs-addr -- xrefl-addr )
     xrefs.data xrefl dynarr-append
     >r
-    dup r@ xrefl.name-len !
+    dup r@ xrefl.name-len c!
     r@ xrefl.name swap move
-
     0 r@ xrefl.value !
     r@ xrefl.data dynarr-init
     r>
@@ -64,7 +68,7 @@ Constant xrefs \ array of xrefl (xref plural)
     ?DO
         2dup
         i xrefl.name
-        i xrefl.name-len @
+        i xrefl.name-len c@
         compare 0= IF 2drop i UNLOOP EXIT THEN
     xrefl +LOOP
     2drop
@@ -97,13 +101,17 @@ Constant xrefs \ array of xrefl (xref plural)
 ;
 
 : xrefl-apply ( base-addr xrefl-addr -- )
-    dup  xrefl.value
-    over xrefl.data @ dup dynarr.size @ swap dynarr.data @ +
-    rot  xrefl.data @ dynarr.data @
-    DO ( base-addr xrefl-value )
+    dup xrefl.assigned c@
+    0= IF
+        dup xrefl.name over xrefl.name-len c@ type
+        ."  is never assigned" cr
+    THEN
+    dup xrefl.value @
+    swap xrefl.data dynarr-range
+    ?DO ( base-addr xrefl-value )
         2dup swap
-        i xrefp.offset +
-        i xrefp.xt !
+        i xrefp.offset @ +
+        i xrefp.xt @ execute
     xrefp +LOOP
     2drop
 ;
@@ -113,14 +121,14 @@ Constant xrefs \ array of xrefl (xref plural)
     ?DO
         dup i xrefl-apply
     xrefl +LOOP
+    drop
 ;
 
 : xval ( name-addr name-u val-n xrefs-addr -- )
     swap >r
-    2 pick 2 pick 2 pick
-    xrefl-find
-    ?dup 0= IF xrefl-new ELSE >r drop drop drop r> THEN
+    xrefl-ensure dup
     r> swap xrefl.value !
+    xrefl.assigned 1 swap c!
 ;
 
 : xgetval ( name-addr name-u xrefs-addr -- val-u )

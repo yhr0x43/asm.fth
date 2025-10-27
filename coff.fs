@@ -83,15 +83,15 @@ Constant IMAGE_FILE_HEADER
 00000800 Constant IMAGE_SCN_LNK_REMOVE                   \ Section contents will not become part of image.
 00001000 Constant IMAGE_SCN_LNK_COMDAT                   \ Section contents comdat.
 \ 00002000 Reserved.
-\ 00004000 Constant IMAGE_SCN_MEM_PROTECTED - Obsolete   
+\ 00004000 Constant IMAGE_SCN_MEM_PROTECTED - Obsolete
 00004000 Constant IMAGE_SCN_NO_DEFER_SPEC_EXC            \ Reset speculative exceptions handling bits in the TLB entries for this section.
 00008000 Constant IMAGE_SCN_GPREL                        \ Section content can be accessed relative to GP
-00008000 Constant IMAGE_SCN_MEM_FARDATA                
-\ 00010000 Constant IMAGE_SCN_MEM_SYSHEAP  - Obsolete    
-00020000 Constant IMAGE_SCN_MEM_PURGEABLE              
-00020000 Constant IMAGE_SCN_MEM_16BIT                  
-00040000 Constant IMAGE_SCN_MEM_LOCKED                 
-00080000 Constant IMAGE_SCN_MEM_PRELOAD                
+00008000 Constant IMAGE_SCN_MEM_FARDATA
+\ 00010000 Constant IMAGE_SCN_MEM_SYSHEAP  - Obsolete
+00020000 Constant IMAGE_SCN_MEM_PURGEABLE
+00020000 Constant IMAGE_SCN_MEM_16BIT
+00040000 Constant IMAGE_SCN_MEM_LOCKED
+00080000 Constant IMAGE_SCN_MEM_PRELOAD
 
 00100000 Constant IMAGE_SCN_ALIGN_1BYTES                 \
 00200000 Constant IMAGE_SCN_ALIGN_2BYTES                 \
@@ -120,17 +120,17 @@ Constant IMAGE_FILE_HEADER
 
 8 Constant IMAGE_SIZEOF_SHORT_NAME
 0
-    IMAGE_SIZEOF_SHORT_NAME +Field scn.Name
-    0 +Field scn.PhysicalAddress
-    4 +Field scn.VirtualSize
-    4 +Field scn.VirtualAddress
-    4 +Field scn.SizeOfRawData
-    4 +Field scn.PointerToRawData
-    4 +Field scn.PointerToRelocations
-    4 +Field scn.PointerToLinenumbers
-    2 +Field scn.NumberOfRelocations
-    2 +Field scn.NumberOfLinenumbers
-    4 +Field scn.Characteristics
+    IMAGE_SIZEOF_SHORT_NAME +Field coffsect.Name
+    0 +Field coffsect.PhysicalAddress
+    4 +Field coffsect.VirtualSize
+    4 +Field coffsect.VirtualAddress
+    4 +Field coffsect.SizeOfRawData
+    4 +Field coffsect.PointerToRawData
+    4 +Field coffsect.PointerToRelocations
+    4 +Field coffsect.PointerToLinenumbers
+    2 +Field coffsect.NumberOfRelocations
+    2 +Field coffsect.NumberOfLinenumbers
+    4 +Field coffsect.Characteristics
 Constant IMAGE_SECTION_HEADER
 
 \ Section values
@@ -206,5 +206,88 @@ FF Constant IMAGE_SYM_CLASS_END_OF_FUNCTION
     1 +Field sym.StorageClass
     1 +Field sym.NumberOfAuxSymbols
 Constant IMAGE_SYMBOL
+
+require asm.fs
+
+: .endasm ( fd -- )
+    resolve-all-xrefs
+
+    \ initialize the output buffer
+    refable allocate throw
+    dup rfb.buffer dynarr-init
+    dup rfb.xrefs dynarr-init
+    this_sect !
+
+    \ 1. file header
+    IMAGE_FILE_MACHINE_AMD64	.dw \ Machine
+    sect-count			.dw \ NumberOfSections
+    3A9DF370			.dd \ TimeDateStamp
+    s" coff.SymbolTable"	.rd \ PointerToSymbolTable
+    00000000			.dd \ NumberOfSymbols
+    0000			.dw \ SizeOfOptionalHeader
+    0000			.dw \ Characteristics
+
+    \ 2. section lists
+    sect_list dynarr-range
+    ?DO
+        \ TODO: need a better way to handle section name so it supports
+        \ name longer than 8 chars
+        i sect.name-len @ 8 > IF ABORT" section name too long" THEN
+        i sect.name 8			.ds \ Name
+        00000000			.dd \ VirtualSize
+        00000000			.dd \ VirutalAddress
+        i rfb.buffer dynarr.size @	.dd \ SizeOfRawData
+        pad
+        dup s" sect." >r swap r> move
+        dup 5 + i sect.name swap i sect.name-len @ move
+        i sect.name-len @ 5 +
+                                        .rd \ PointerToRawData
+        00000000			.dd \ PointerToRelocations
+        00000000			.dd \ PointerToLinenumbers
+        0000				.dw \ NumberOfRelocations
+        0000				.dw \ NumberOfLinenumbers
+        60500020			.dd \ Characteristics
+    sect +LOOP
+
+    \ 3. symbol table
+    \ FIXME: stub!
+    s" coff.SymbolTable" .cur	.equ
+    00000000			.dd \ zeroes | union w/ ShortName
+    s" strn.main"		.rd \ offset |
+    00000000			.dd \ Value (offset)
+    0001			.dw \ SectionNumber
+    0020			.dw \ Type
+    IMAGE_SYM_CLASS_EXTERNAL	.db \ StoageClass
+    00				.db \ NumberOfAuxSymbols
+
+    \ 4. string table
+    \ FIXME: stub!
+    s" coff.StringTableStart" .cur					.equ
+    s" coff.StringTableSize"	.rd \ String table size
+    s" strn.main" .cur s" coff.StringTableStart" .val -			.equ
+    s" main"			.ds 00 .db
+    s" coff.StringTableSize" .cur s" coff.StringTableStart" .val -	.equ
+
+    \ 5. section data
+    sect_list dynarr-range
+    ?DO
+        pad
+        dup s" sect." >r swap r> move
+        dup 5 + i sect.name swap i sect.name-len @ move
+        i sect.name-len @ 5 +
+        .cur .equ
+        i rfb.buffer dynarr-@		.ds
+    sect +LOOP
+
+    this_sect @ rfb.xrefs xrefs-? cr
+
+    this_sect @ rfb.buffer dynarr.data @
+    this_sect @ rfb.xrefs
+    xrefs-apply
+
+    this_sect @ rfb.buffer dynarr-@
+    2 pick write-file throw
+    close-file throw
+;
 
 base !
