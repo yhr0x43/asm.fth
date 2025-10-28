@@ -223,7 +223,7 @@ require asm.fs
     sect-count			.dw \ NumberOfSections
     3A9DF370			.dd \ TimeDateStamp
     s" coff.SymbolTable"	.rd \ PointerToSymbolTable
-    00000000			.dd \ NumberOfSymbols
+    00000001			.dd \ NumberOfSymbols
     0000			.dw \ SizeOfOptionalHeader
     0000			.dw \ Characteristics
 
@@ -253,7 +253,7 @@ require asm.fs
     \ FIXME: stub!
     s" coff.SymbolTable" .cur	.equ
     00000000			.dd \ zeroes | union w/ ShortName
-    s" strn.main"		.rd \ offset |
+    s" strn._start"		.rd \ offset |
     00000000			.dd \ Value (offset)
     0001			.dw \ SectionNumber
     0020			.dw \ Type
@@ -264,8 +264,8 @@ require asm.fs
     \ FIXME: stub!
     s" coff.StringTableStart" .cur					.equ
     s" coff.StringTableSize"	.rd \ String table size
-    s" strn.main" .cur s" coff.StringTableStart" .val -			.equ
-    s" main"			.ds 00 .db
+    s" strn._start" .cur s" coff.StringTableStart" .val -		.equ
+    s" _start"			.ds 00 .db
     s" coff.StringTableSize" .cur s" coff.StringTableStart" .val -	.equ
 
     \ 5. section data
