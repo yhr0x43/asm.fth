@@ -279,8 +279,6 @@ require asm.fs
         i rfb.buffer dynarr-@		.ds
     sect +LOOP
 
-    this_sect @ rfb.xrefs xrefs-? cr
-
     this_sect @ rfb.buffer dynarr.data @
     this_sect @ rfb.xrefs
     xrefs-apply
