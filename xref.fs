@@ -43,36 +43,45 @@ Constant xrefs \ array of xrefl (xref plural)
 
 : xrefs-? ( xrefs-addr -- )
     ." xrefs:" cr
-    dynarr-range
+    xrefs.data dynarr-range
     ?DO
         i xrefl-? cr
     xrefl +LOOP
 ;
 
+: xrefl-init ( name-addr name-u xrefl-addr -- )
+    dup  xrefl.value    0 swap !
+    dup  xrefl.data     dynarr-init
+    2dup xrefl.name-len c!
+    xrefl.name swap cmove
+;
+
 : xrefl-new ( name-addr name-u xrefs-addr -- xrefl-addr )
     xrefs.data xrefl dynarr-append
-    >r
-    dup r@ xrefl.name-len c!
-    r@ xrefl.name swap move
-    0 r@ xrefl.value !
-    r@ xrefl.data dynarr-init
-    r>
+    dup >r xrefl-init r>
+;
+
+: xrefl= ( xrefl1-addr xrefl2-addr -- f )
+    dup  xrefl.name
+    swap xrefl.name-len c@
+    rot
+    dup  xrefl.name
+    swap xrefl.name-len c@
+    compare 0=
 ;
 
 : xrefl-find ( name-addr name-u xrefs-addr -- xrefl-addr | 0 )
-    over 32 > IF
-        ABORT" symbol name longer than 32 not supported"
+    over 20 > IF
+        ABORT" symbol name longer than 20h not supported"
     THEN
-    dynarr-range
-    \ for each xrefl in the xrefs
-    ?DO
-        2dup
-        i xrefl.name
-        i xrefl.name-len c@
-        compare 0= IF 2drop i UNLOOP EXIT THEN
-    xrefl +LOOP
-    2drop
-    0 \ results 0 when xrefl not found
+    >r \ xref-addr
+    \ FIXME: assumed CS is DS, is this assumption true?
+    AHEAD [ here >r xrefl allot ] THEN [ r> ] literal \ pad
+    dup >r
+    xrefl-init
+    r> \ pad
+    r> \ xrefs-addr
+    ['] xrefl= xrefl dynarr-find
 ;
 
 : xrefp-new ( offset-n xt xrefl-addr -- xrefp-addr )
@@ -88,7 +97,7 @@ Constant xrefs \ array of xrefl (xref plural)
     ?dup 0= IF
         xrefl-new
     ELSE
-        >r drop drop drop r>
+        nip nip nip
     THEN
 ;
 
@@ -125,9 +134,9 @@ Constant xrefs \ array of xrefl (xref plural)
 ;
 
 : xval ( name-addr name-u val-n xrefs-addr -- )
-    swap >r
-    xrefl-ensure dup
-    r> swap xrefl.value !
+    3 roll 3 roll rot ( val-n name-addr name-u xrefs-addr )
+    xrefl-ensure
+    swap over xrefl.value !
     xrefl.assigned 1 swap c!
 ;
 

@@ -67,3 +67,15 @@ Constant dynarr
     dup dynarr.size ?
         dynarr.cap  ?
 ;
+
+: dynarr-find ( val-addr da-addr =xt size-u -- addr | 0 )
+    rot
+    dynarr-range
+    ?DO ( val-addr =xt size-u )
+        2 pick 2 pick 2 pick
+        rot rot ( size-u val-addr =xt )
+        i swap execute IF 2drop 2drop i UNLOOP EXIT THEN
+    +LOOP ( val-addr )
+    drop 2drop
+    0
+;

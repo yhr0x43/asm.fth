@@ -196,16 +196,13 @@ FF Constant IMAGE_SYM_CLASS_END_OF_FUNCTION
 
 6B Constant IMAGE_SYM_CLASS_CLR_TOKEN
 
-0
-    0 +Field sym.ShortName
-    4 +Field sym.Short \ if 0, use LongName
-    4 +Field sym.Long  \ offset into string table
-    4 +Field sym.Value
-    2 +Field sym.SectionNumber
-    2 +Field sym.Type
-    1 +Field sym.StorageClass
-    1 +Field sym.NumberOfAuxSymbols
-Constant IMAGE_SYMBOL
+
+$000F	Constant N_BTMASK
+$0030	Constant N_TMASK
+$00C0	Constant N_TMASK1
+$00F0	Constant N_TMASK2
+4	Constant N_BTSHFT
+2	Constant N_TSHIFT
 
 require asm.fs
 
@@ -234,31 +231,33 @@ require asm.fs
         \ name longer than 8 chars
         i sect.name-len @ 8 > IF ABORT" section name too long" THEN
         i sect.name 8			.ds \ Name
-        00000000			.dd \ VirtualSize
-        00000000			.dd \ VirutalAddress
+        $00000000			.dd \ VirtualSize
+        $00000000			.dd \ VirutalAddress
         i rfb.buffer dynarr.size @	.dd \ SizeOfRawData
         pad
         dup s" sect." >r swap r> move
         dup 5 + i sect.name swap i sect.name-len @ move
         i sect.name-len @ 5 +
                                         .rd \ PointerToRawData
-        00000000			.dd \ PointerToRelocations
-        00000000			.dd \ PointerToLinenumbers
-        0000				.dw \ NumberOfRelocations
-        0000				.dw \ NumberOfLinenumbers
-        60500020			.dd \ Characteristics
+        $00000000			.dd \ PointerToRelocations
+        $00000000			.dd \ PointerToLinenumbers
+        $0000				.dw \ NumberOfRelocations
+        $0000				.dw \ NumberOfLinenumbers
+        $60500020			.dd \ Characteristics
     sect +LOOP
 
     \ 3. symbol table
     \ FIXME: stub!
     s" coff.SymbolTable" .cur	.equ
-    00000000			.dd \ zeroes | union w/ ShortName
-    s" strn._start"		.rd \ offset |
-    00000000			.dd \ Value (offset)
-    0001			.dw \ SectionNumber
-    0020			.dw \ Type
+    \ 00000000			.dd \ zeroes | union w/ ShortName
+    \ s" strn._start"		.rd \ offset |
+    s" _start" .ds $00 .db $00 .db
+    $00000000			.dd \ Value (offset)
+    $0001			.dw \ SectionNumber
+    IMAGE_SYM_DTYPE_FUNCTION N_BTSHFT lshift
+                                .dw \ Type
     IMAGE_SYM_CLASS_EXTERNAL	.db \ StoageClass
-    00				.db \ NumberOfAuxSymbols
+    $00				.db \ NumberOfAuxSymbols
 
     \ 4. string table
     \ FIXME: stub!
