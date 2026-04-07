@@ -1,6 +1,4 @@
-\ xref.fs - provide named reference to a offste in a dynarr
-\ Typical Usage:
-\
+\ xref.fs - provide named reference to a offset in a dynarr
 
 require dynarr.fs
 

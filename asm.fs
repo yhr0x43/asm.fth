@@ -84,6 +84,7 @@ Variable this_sect
 : .db ( c -- )      this_sect @ rfb.buffer 1 dynarr-append c! ;
 : .dw ( w -- )      this_sect @ rfb.buffer 2 dynarr-append w! ;
 : .dd ( u -- )      this_sect @ rfb.buffer 4 dynarr-append l! ;
+: .dq ( q -- )      this_sect @ rfb.buffer 8 dynarr-append ! ;
 : .ds ( addr u -- ) this_sect @ rfb.buffer over dynarr-append swap move ;
 
 : .rb ( c -- ) .cur ['] c! this_sect @ rfb.xrefs xref 0 .db ;
